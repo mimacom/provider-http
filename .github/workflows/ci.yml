@@ -5,6 +5,7 @@ on:
     branches:
       - mima
       - release-*
+      - mima-release-*
   pull_request: {}
   workflow_dispatch: {}
 

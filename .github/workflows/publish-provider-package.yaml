@@ -14,6 +14,9 @@ on:
 
 jobs:
   publish-provider-package:
+    # Only mima-release-* branches may publish/release the provider package;
+    # release-fork.yml dispatches this workflow against that branch.
+    if: startsWith(github.ref, 'refs/heads/mima-release-')
     uses: crossplane-contrib/provider-workflows/.github/workflows/publish-provider-non-family.yml@main
     with:
       registry_org: mimacom
@@ -30,7 +33,7 @@ jobs:
     name: Sign OCI Package
     needs: [publish-provider-package]
     runs-on: ubuntu-latest
-    if: github.event.inputs.version != ''
+    if: github.event.inputs.version != '' && startsWith(github.ref, 'refs/heads/mima-release-')
     permissions:
       contents: write
       packages: write
@@ -53,9 +56,22 @@ jobs:
             --yes \
             ghcr.io/mimacom/${{ github.event.repository.name }}:${{ github.event.inputs.version }}
 
-      - name: Attach cosign.pub to GitHub Release
+      # Publish the GitHub Release carrying the cosign public key so it can be
+      # verified (air-gapped, no Rekor). Create the release if it does not exist
+      # yet, otherwise just (re)attach the key. crossplane-gitops/release-fork.yml
+      # validates this signature after the dispatch completes.
+      - name: Publish GitHub Release with cosign.pub
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          gh release upload ${{ github.event.inputs.version }} release/cosign.pub \
-            --repo ${{ github.repository }} --clobber
+          set -euo pipefail
+          if gh release view "${VERSION}" --repo ${{ github.repository }} >/dev/null 2>&1; then
+            gh release upload "${VERSION}" release/cosign.pub \
+              --repo ${{ github.repository }} --clobber
+          else
+            gh release create "${VERSION}" release/cosign.pub \
+              --repo  ${{ github.repository }} \
+              --title "${VERSION}" \
+              --notes "mimacom signed release ${VERSION}."
+          fi
