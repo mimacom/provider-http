@@ -74,6 +74,7 @@ linters:
           - dupl
           - errcheck
           - exportloopref
+          - goconst
           - gocyclo
           - gosec
           - unparam
@@ -97,6 +98,22 @@ linters:
       - linters:
           - staticcheck
         text: 'QF1001:'
+      - linters:
+          - staticcheck
+        text: 'SA1019: scheme.Builder is deprecated'
+      - linters:
+          - staticcheck
+        text: 'SA1019: managed.WithExternalConnecter is deprecated'
+      - linters:
+          - govet
+        text: 'inline: cannot inline'
+      # controller-runtime deprecated GetEventRecorderFor in favor of
+      # GetEventRecorder, but crossplane-runtime's event.NewAPIRecorder
+      # still requires the old record.EventRecorder type. Suppress until
+      # crossplane-runtime adapts to the new events.EventRecorder API.
+      - linters:
+          - staticcheck
+        text: 'SA1019: mgr.GetEventRecorderFor is deprecated'
     paths:
       - zz_generated\..+\.go$
       - third_party$
