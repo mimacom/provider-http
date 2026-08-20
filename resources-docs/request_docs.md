@@ -52,6 +52,37 @@ Here is an example `Request` resource definition:
 ### Secrets Injection
 The DisposableRequest resource supports injecting data from secrets into the request's body and headers using the following syntax: {{ name:namespace:key }} (supported for body and headers only).
 
+### Read-Only / Polling Mode
+A `Request` doesn't require a mapping for every action. If a mapping isn't found for CREATE, UPDATE, or REMOVE, the provider logs it and skips that action - it's not treated as an error. Defining only an OBSERVE (GET) mapping therefore turns a `Request` into a periodic, read-only poller: on every reconcile it issues the GET, and - combined with `secretInjectionConfigs` - can extract fields from the response into a Secret without ever attempting to create, update, or delete anything.
+
+This is useful for syncing data from an existing endpoint you don't manage the lifecycle of - for example, mirroring a value from an external API into a Secret so other resources can reference it.
+
+  ```yaml
+  apiVersion: http.crossplane.io/v1alpha2
+  kind: Request
+  metadata:
+    name: sync-external-status
+  spec:
+    forProvider:
+      headers:
+        Authorization:
+          - "Bearer {{ auth:default:token }}"
+      payload:
+        baseUrl: "https://api.example.com/v1/status"
+      mappings:
+        # Only an OBSERVE mapping - no CREATE, UPDATE, or REMOVE, so this
+        # Request never attempts to modify anything at the remote endpoint.
+        - action: OBSERVE
+          url: .payload.baseUrl
+      secretInjectionConfigs:
+        - secretRef:
+            name: external-status
+            namespace: default
+          keyMappings:
+            - secretKey: status
+              responseJQ: .body.status
+  ```
+
 ## PUT Mapping - Desired State
 The PUT mapping represents your desired state. The body in this mapping should be contained in the GET response. If it's not, a PUT request will be sent with the according body.
 

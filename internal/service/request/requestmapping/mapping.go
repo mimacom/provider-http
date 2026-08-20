@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	ErrMappingNotFound = "%s or %s mapping doesn't exist in request, skipping operation"
+	ErrMappingNotFound = "no %s mapping defined for method %s - skipping this operation (expected for read-only Requests that only define an OBSERVE mapping)"
 )
 
 var (
