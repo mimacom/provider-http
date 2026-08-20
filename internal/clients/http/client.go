@@ -33,7 +33,7 @@ type TLSConfigData struct {
 
 // Client is the interface to interact with Http
 type Client interface {
-	SendRequest(ctx context.Context, method string, url string, body Data, headers Data, tlsConfig *TLSConfigData) (resp HttpDetails, err error)
+	SendRequest(ctx context.Context, method string, url Data, body Data, headers Data, tlsConfig *TLSConfigData) (resp HttpDetails, err error)
 }
 
 type client struct {
@@ -89,15 +89,17 @@ type HttpDetails struct {
 }
 
 // SendRequest sends an HTTP request with optional TLS configuration.
-func (hc *client) SendRequest(ctx context.Context, method string, url string, body Data, headers Data, tlsConfigData *TLSConfigData) (details HttpDetails, err error) {
+func (hc *client) SendRequest(ctx context.Context, method string, url Data, body Data, headers Data, tlsConfigData *TLSConfigData) (details HttpDetails, err error) {
 	requestBody := []byte(body.Decrypted.(string))
 
 	// request contains the HTTP request that will be sent.
-	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(requestBody))
+	request, err := http.NewRequestWithContext(ctx, method, url.Decrypted.(string), bytes.NewBuffer(requestBody))
 
-	// requestDetails contains the request details that will be logged.
+	// requestDetails contains the request details that will be logged. URL uses the
+	// Encrypted (placeholder-preserved) form, same as Body/Headers, so a resolved
+	// secret value is never persisted to status or logs.
 	requestDetails := HttpRequest{
-		URL:     url,
+		URL:     url.Encrypted.(string),
 		Body:    body.Encrypted.(string),
 		Headers: headers.Encrypted.(map[string][]string),
 		Method:  method,

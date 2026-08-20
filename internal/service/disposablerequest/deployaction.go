@@ -53,6 +53,11 @@ func DeployAction(svcCtx *service.ServiceContext, crCtx *service.DisposableReque
 
 // sendHttpRequest sends the HTTP request with sensitive data patched
 func sendHttpRequest(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPRequestSpec) (httpClient.HttpDetails, error) {
+	sensitiveURL, err := datapatcher.PatchSecretsIntoString(svcCtx.Ctx, svcCtx.LocalKube, spec.GetURL(), svcCtx.Logger)
+	if err != nil {
+		return httpClient.HttpDetails{}, err
+	}
+
 	sensitiveBody, err := datapatcher.PatchSecretsIntoString(svcCtx.Ctx, svcCtx.LocalKube, spec.GetBody(), svcCtx.Logger)
 	if err != nil {
 		return httpClient.HttpDetails{}, err
@@ -63,9 +68,10 @@ func sendHttpRequest(svcCtx *service.ServiceContext, spec interfaces.SimpleHTTPR
 		return httpClient.HttpDetails{}, err
 	}
 
+	urlData := httpClient.Data{Encrypted: spec.GetURL(), Decrypted: sensitiveURL}
 	bodyData := httpClient.Data{Encrypted: spec.GetBody(), Decrypted: sensitiveBody}
 	headersData := httpClient.Data{Encrypted: spec.GetHeaders(), Decrypted: sensitiveHeaders}
-	details, err := svcCtx.HTTP.SendRequest(svcCtx.Ctx, spec.GetMethod(), spec.GetURL(), bodyData, headersData, svcCtx.TLSConfigData)
+	details, err := svcCtx.HTTP.SendRequest(svcCtx.Ctx, spec.GetMethod(), urlData, bodyData, headersData, svcCtx.TLSConfigData)
 
 	return details, err
 }

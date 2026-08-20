@@ -549,7 +549,7 @@ func TestSendRequest(t *testing.T) {
 				t.Fatalf("NewClient(...): unexpected error: %v", err)
 			}
 
-			got, gotErr := c.SendRequest(context.Background(), tc.args.method, server.URL, tc.args.body, tc.args.headers, tc.args.tlsConfig)
+			got, gotErr := c.SendRequest(context.Background(), tc.args.method, Data{Encrypted: server.URL, Decrypted: server.URL}, tc.args.body, tc.args.headers, tc.args.tlsConfig)
 
 			if tc.want.err != nil || tc.want.errContains != "" {
 				if gotErr == nil {
@@ -611,7 +611,7 @@ func TestSendRequestIntegration(t *testing.T) {
 		result, err := c.SendRequest(
 			context.Background(),
 			http.MethodGet,
-			server.URL,
+			Data{Encrypted: server.URL, Decrypted: server.URL},
 			Data{Encrypted: "", Decrypted: ""},
 			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
 			tlsConfig,
@@ -972,7 +972,7 @@ func TestHTTPClientConfiguration(t *testing.T) {
 		_, err = c.SendRequest(
 			context.Background(),
 			http.MethodGet,
-			server.URL,
+			Data{Encrypted: server.URL, Decrypted: server.URL},
 			Data{Encrypted: "", Decrypted: ""},
 			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
 			&TLSConfigData{},
@@ -998,7 +998,7 @@ func TestHTTPClientConfiguration(t *testing.T) {
 		_, err = c.SendRequest(
 			context.Background(),
 			http.MethodGet,
-			server.URL,
+			Data{Encrypted: server.URL, Decrypted: server.URL},
 			Data{Encrypted: "", Decrypted: ""},
 			Data{Encrypted: map[string][]string{}, Decrypted: map[string][]string{}},
 			&TLSConfigData{},
