@@ -613,7 +613,8 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: insecureSkipTLSVerify and tlsConfig are mutually exclusive
-                  rule: '!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))'
+                  rule: '!(has(self.insecureSkipTLSVerify) && self.insecureSkipTLSVerify
+                    && has(self.tlsConfig))'
               managementPolicies:
                 default:
                 - '*'

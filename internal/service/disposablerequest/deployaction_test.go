@@ -12,6 +12,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -23,13 +24,13 @@ const (
 	testBody           = `{"username": "john_doe"}`
 )
 
-type MockSendRequestFn func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error)
+type MockSendRequestFn func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error)
 
 type MockHttpClient struct {
 	MockSendRequest MockSendRequestFn
 }
 
-func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+func (c *MockHttpClient) SendRequest(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 	return c.MockSendRequest(ctx, method, url, body, headers, tlsConfigData)
 }
 
@@ -112,7 +113,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -167,7 +168,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, errBoom
 					},
 				},
@@ -192,7 +193,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 500,
@@ -230,7 +231,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -278,7 +279,7 @@ func TestDeployAction(t *testing.T) {
 					}),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -315,7 +316,7 @@ func TestDeployAction(t *testing.T) {
 					MockStatusUpdate: test.NewMockSubResourceUpdateFn(nil),
 				},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 201,
@@ -393,7 +394,7 @@ func TestSendHttpRequest(t *testing.T) {
 				},
 				localKube: &test.MockClient{},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{
 							HttpResponse: httpClient.HttpResponse{
 								StatusCode: 200,
@@ -419,7 +420,7 @@ func TestSendHttpRequest(t *testing.T) {
 				},
 				localKube: &test.MockClient{},
 				httpClient: &MockHttpClient{
-					MockSendRequest: func(ctx context.Context, method string, url string, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+					MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
 						return httpClient.HttpDetails{}, errBoom
 					},
 				},
@@ -452,6 +453,52 @@ func TestSendHttpRequest(t *testing.T) {
 				t.Errorf("\n%s\nsendHttpRequest(...): wanted status code %d, got %d", tc.reason, tc.want.statusCode, details.HttpResponse.StatusCode)
 			}
 		})
+	}
+}
+
+// TestSendHttpRequest_ResolvesSecretsInURL is a regression test: sendHttpRequest
+// must resolve {{ name:namespace:key }} placeholders in the URL, the same way it
+// already does for Body and Headers, and must never pass the resolved secret
+// value as the Encrypted (status/logged) form.
+func TestSendHttpRequest_ResolvesSecretsInURL(t *testing.T) {
+	var gotURL httpClient.Data
+
+	spec := &v1alpha2.DisposableRequestParameters{
+		URL:    "https://api.example.com/users?token={{ my-secret:my-namespace:token }}",
+		Method: "GET",
+	}
+
+	localKube := &test.MockClient{
+		MockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+			secret, ok := obj.(*corev1.Secret)
+			if !ok {
+				return errors.New("object is not a Secret")
+			}
+			secret.Data = map[string][]byte{"token": []byte("real-token-value")}
+			return nil
+		},
+	}
+
+	mockHTTP := &MockHttpClient{
+		MockSendRequest: func(ctx context.Context, method string, url httpClient.Data, body httpClient.Data, headers httpClient.Data, tlsConfigData *httpClient.TLSConfigData) (resp httpClient.HttpDetails, err error) {
+			gotURL = url
+			return httpClient.HttpDetails{HttpResponse: httpClient.HttpResponse{StatusCode: 200}}, nil
+		},
+	}
+
+	svcCtx := service.NewServiceContext(context.Background(), localKube, logging.NewNopLogger(), mockHTTP, nil)
+	if _, err := sendHttpRequest(svcCtx, spec); err != nil {
+		t.Fatalf("sendHttpRequest(...): unexpected error: %v", err)
+	}
+
+	wantEncrypted := "https://api.example.com/users?token={{ my-secret:my-namespace:token }}"
+	wantDecrypted := "https://api.example.com/users?token=real-token-value"
+
+	if gotURL.Encrypted != wantEncrypted {
+		t.Errorf("sendHttpRequest(...): url.Encrypted = %q, want %q", gotURL.Encrypted, wantEncrypted)
+	}
+	if gotURL.Decrypted != wantDecrypted {
+		t.Errorf("sendHttpRequest(...): url.Decrypted = %q, want %q", gotURL.Decrypted, wantDecrypted)
 	}
 }
 

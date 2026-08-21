@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -41,6 +42,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/customresourcesgate"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 
 	"github.com/crossplane-contrib/provider-http/apis"
 	httpcontrollers "github.com/crossplane-contrib/provider-http/internal/controller"
@@ -56,6 +59,7 @@ func main() {
 		pollInterval             = app.Flag("poll", "How often individual resources will be checked for drift from the desired state").Default("1m").Duration()
 		maxReconcileRate         = app.Flag("max-reconcile-rate", "The global maximum rate per second at which resources may checked for drift from the desired state.").Default("10").Int()
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
+		pollStateMetricInterval  = app.Flag("poll-state-metric", "State metric recording interval").Default("5s").Duration()
 
 		// namespace = app.Flag("namespace", "Namespace used to set as default scope in default secret store config.").Default("crossplane-system").Envar("POD_NAMESPACE").String()
 	)
@@ -91,6 +95,12 @@ func main() {
 	// Add CRD types to scheme for SafeStart capability
 	kingpin.FatalIfError(apiextensionsv1.AddToScheme(mgr.GetScheme()), "Cannot add CRD APIs to scheme")
 
+	metricRecorder := managed.NewMRMetricRecorder()
+	stateMetrics := statemetrics.NewMRStateMetrics()
+
+	metrics.Registry.MustRegister(metricRecorder)
+	metrics.Registry.MustRegister(stateMetrics)
+
 	o := controller.Options{
 		Logger:                  log,
 		MaxConcurrentReconciles: *maxReconcileRate,
@@ -98,6 +108,11 @@ func main() {
 		GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
 		Features:                &feature.Flags{},
 		Gate:                    new(gate.Gate[schema.GroupVersionKind]),
+		MetricOptions: &controller.MetricOptions{
+			PollStateMetricInterval: *pollStateMetricInterval,
+			MRMetrics:               metricRecorder,
+			MRStateMetrics:          stateMetrics,
+		},
 	}
 
 	// Enable management policies if flag is set

@@ -8,6 +8,8 @@ import (
 	httpClient "github.com/crossplane-contrib/provider-http/internal/clients/http"
 	"github.com/crossplane-contrib/provider-http/internal/service"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
@@ -100,7 +102,10 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url: "https://api.example.com/users",
+					Url: httpClient.Data{
+						Encrypted: "https://api.example.com/users",
+						Decrypted: "https://api.example.com/users",
+					},
 					Body: httpClient.Data{
 						Encrypted: `{"email":"john.doe@example.com","username":"john_doe"}`,
 						Decrypted: `{"email":"john.doe@example.com","username":"john_doe"}`,
@@ -127,7 +132,10 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url: "https://api.example.com/users/123",
+					Url: httpClient.Data{
+						Encrypted: "https://api.example.com/users/123",
+						Decrypted: "https://api.example.com/users/123",
+					},
 					Body: httpClient.Data{
 						Encrypted: `{"username":"john_doe_new_username"}`,
 						Decrypted: `{"username":"john_doe_new_username"}`,
@@ -154,7 +162,10 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url: "https://api.example.com/users/123",
+					Url: httpClient.Data{
+						Encrypted: "https://api.example.com/users/123",
+						Decrypted: "https://api.example.com/users/123",
+					},
 					Headers: httpClient.Data{
 						Decrypted: map[string][]string{},
 						Encrypted: map[string][]string{},
@@ -181,7 +192,52 @@ func Test_GenerateRequestDetails(t *testing.T) {
 			},
 			want: want{
 				requestDetails: RequestDetails{
-					Url: "https://api.example.com/users/123",
+					Url: httpClient.Data{
+						Encrypted: "https://api.example.com/users/123",
+						Decrypted: "https://api.example.com/users/123",
+					},
+					Headers: httpClient.Data{
+						Decrypted: map[string][]string{},
+						Encrypted: map[string][]string{},
+					},
+					Body: httpClient.Data{
+						Decrypted: "",
+						Encrypted: "",
+					},
+				},
+				err: nil,
+				ok:  true,
+			},
+		},
+		"SuccessGetWithSecretInURL": {
+			// Regression test: generateURL must resolve {{ name:namespace:key }}
+			// placeholders the same way generateBody/generateHeaders do, so a
+			// secret-backed value can be used inside a mapping's URL.
+			args: args{
+				methodMapping: v1alpha2.Mapping{
+					Method: "GET",
+					URL:    `("https://api.example.com/users?token={{ my-secret:my-namespace:token }}")`,
+				},
+				forProvider: testForProvider,
+				response:    v1alpha2.Response{},
+				logger:      logging.NewNopLogger(),
+				localKube: &test.MockClient{
+					MockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+						secret, ok := obj.(*corev1.Secret)
+						if !ok {
+							return errors.New("object is not a Secret")
+						}
+						secret.Data = map[string][]byte{"token": []byte("real-token-value")}
+						return nil
+					},
+				},
+			},
+			want: want{
+				requestDetails: RequestDetails{
+					Url: httpClient.Data{
+						Encrypted: "https://api.example.com/users?token={{ my-secret:my-namespace:token }}",
+						Decrypted: "https://api.example.com/users?token=real-token-value",
+					},
 					Headers: httpClient.Data{
 						Decrypted: map[string][]string{},
 						Encrypted: map[string][]string{},
@@ -238,7 +294,10 @@ func Test_IsRequestValid(t *testing.T) {
 						Decrypted: nil,
 						Encrypted: nil,
 					},
-					Url: "https://example",
+					Url: httpClient.Data{
+						Encrypted: "https://example",
+						Decrypted: "https://example",
+					},
 				},
 			},
 			want: want{
@@ -256,7 +315,10 @@ func Test_IsRequestValid(t *testing.T) {
 						Decrypted: nil,
 						Encrypted: nil,
 					},
-					Url: "",
+					Url: httpClient.Data{
+						Encrypted: "",
+						Decrypted: "",
+					},
 				},
 			},
 			want: want{
@@ -274,7 +336,10 @@ func Test_IsRequestValid(t *testing.T) {
 						Decrypted: nil,
 						Encrypted: nil,
 					},
-					Url: "",
+					Url: httpClient.Data{
+						Encrypted: "",
+						Decrypted: "",
+					},
 				},
 			},
 			want: want{
@@ -292,7 +357,10 @@ func Test_IsRequestValid(t *testing.T) {
 						Decrypted: nil,
 						Encrypted: nil,
 					},
-					Url: "https://example",
+					Url: httpClient.Data{
+						Encrypted: "https://example",
+						Decrypted: "https://example",
+					},
 				},
 			},
 			want: want{

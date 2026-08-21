@@ -32,6 +32,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 	"github.com/crossplane-contrib/provider-http/apis/common"
@@ -77,6 +78,15 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 
 	if o.Features.Enabled(feature.EnableBetaManagementPolicies) {
 		reconcilerOptions = append(reconcilerOptions, managed.WithManagementPolicies())
+	}
+
+	if o.MetricOptions != nil {
+		reconcilerOptions = append(reconcilerOptions, managed.WithMetricRecorder(o.MetricOptions.MRMetrics))
+
+		if err := mgr.Add(statemetrics.NewMRStateRecorder(
+			mgr.GetClient(), o.Logger, o.MetricOptions.MRStateMetrics, &v1alpha2.RequestList{}, o.MetricOptions.PollStateMetricInterval)); err != nil {
+			return err
+		}
 	}
 
 	r := managed.NewReconciler(mgr,

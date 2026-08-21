@@ -40,7 +40,7 @@ const (
 )
 
 // RequestParameters are the configurable fields of a Request.
-// +kubebuilder:validation:XValidation:rule="!(self.insecureSkipTLSVerify == true && has(self.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
+// +kubebuilder:validation:XValidation:rule="!(has(self.insecureSkipTLSVerify) && self.insecureSkipTLSVerify && has(self.tlsConfig))",message="insecureSkipTLSVerify and tlsConfig are mutually exclusive"
 type RequestParameters struct {
 	// Mappings defines the HTTP mappings for different methods.
 	// Either Method or Action must be specified. If both are omitted, the mapping will not be used.
