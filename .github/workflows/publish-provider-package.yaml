@@ -56,21 +56,26 @@ jobs:
             --yes \
             ghcr.io/mimacom/${{ github.event.repository.name }}:${{ github.event.inputs.version }}
 
-      # Publish the GitHub Release carrying the cosign public key so it can be
-      # verified (air-gapped, no Rekor). Create the release if it does not exist
-      # yet, otherwise just (re)attach the key. crossplane-gitops/release-fork.yml
-      # validates this signature after the dispatch completes.
-      - name: Publish GitHub Release with cosign.pub
+      # Publish the GitHub Release. It carries no key material: the public key is
+      # distributed to the customer out-of-band and held centrally in
+      # crossplane-gitops at release/cosign.pub (DCS-21). Shipping cosign.pub as an
+      # asset of the very Release being verified proved nothing — an attacker able
+      # to publish the artifact could publish a matching key.
+      #
+      # The Release itself is still load-bearing: crossplane-gitops
+      # detect-releases.yml treats "a GitHub Release exists" as the definition of
+      # released, so this step must keep creating it. Idempotent — a Release that
+      # already exists is left alone.
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
           if gh release view "${VERSION}" --repo ${{ github.repository }} >/dev/null 2>&1; then
-            gh release upload "${VERSION}" release/cosign.pub \
-              --repo ${{ github.repository }} --clobber
+            echo "GitHub Release ${VERSION} already exists — nothing to do."
           else
-            gh release create "${VERSION}" release/cosign.pub \
+            gh release create "${VERSION}" \
               --repo  ${{ github.repository }} \
               --title "${VERSION}" \
               --notes "mimacom signed release ${VERSION}."
