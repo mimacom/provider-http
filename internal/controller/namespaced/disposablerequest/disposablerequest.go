@@ -143,7 +143,7 @@ func Setup(mgr ctrl.Manager, o controller.Options, timeout time.Duration) error 
 	name := managed.ControllerName(v1alpha2.DisposableRequestGroupKind)
 
 	reconcilerOptions := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(&connector{
+		managed.WithExternalConnector(&connector{
 			logger:          o.Logger,
 			kube:            mgr.GetClient(),
 			usage:           resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha2.ProviderConfigUsage{}),

@@ -98,6 +98,12 @@ linters:
       - linters:
           - staticcheck
         text: 'QF1001:'
+      # crossplane-runtime's event.NewAPIRecorder still takes the old
+      # record.EventRecorder, so GetEventRecorderFor has no replacement yet.
+      # scheme.Builder is the kubebuilder-generated API registration pattern.
+      - linters:
+          - staticcheck
+        text: 'SA1019: .*(GetEventRecorderFor|scheme\.Builder) is deprecated'
       - linters:
           - staticcheck
         text: 'SA1019: scheme.Builder is deprecated'

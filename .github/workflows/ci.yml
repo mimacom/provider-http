@@ -11,7 +11,6 @@ on:
 
 env:
   # Common versions
-  GOLANGCI_VERSION: "v2.12.2"
   DOCKER_BUILDX_VERSION: "v0.35.0"
 
 jobs:
@@ -47,10 +46,14 @@ jobs:
       - name: Vendor Dependencies
         run: make vendor vendor.check
 
+      - name: Detect golangci-lint version
+        id: golangci
+        run: echo "version=v$(awk '/^GOLANGCILINT_VERSION/{sub(/\r$/, "", $3); print $3}' Makefile)" | tee -a "$GITHUB_OUTPUT"
+
       - name: Lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          version: ${{ env.GOLANGCI_VERSION }}
+          version: ${{ steps.golangci.outputs.version }}
           args: --timeout=5m
 
   check-diff:

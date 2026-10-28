@@ -23,10 +23,13 @@ import (
 	"time"
 
 	authv1 "k8s.io/api/authorization/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
@@ -46,6 +49,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 
 	"github.com/crossplane-contrib/provider-http/apis"
+	clusterv1alpha1 "github.com/crossplane-contrib/provider-http/apis/cluster/v1alpha1"
+	namespacedv1alpha2 "github.com/crossplane-contrib/provider-http/apis/namespaced/v1alpha2"
 	httpcontrollers "github.com/crossplane-contrib/provider-http/internal/controller"
 )
 
@@ -60,6 +65,8 @@ func main() {
 		maxReconcileRate         = app.Flag("max-reconcile-rate", "The global maximum rate per second at which resources may checked for drift from the desired state.").Default("10").Int()
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 		pollStateMetricInterval  = app.Flag("poll-state-metric", "State metric recording interval").Default("5s").Duration()
+		enableSecretCache        = app.Flag("enable-secret-cache", "Cache Secrets via a cluster-wide informer. Disabling it routes Secret reads to the API server, trading memory for API server requests.").Default("true").Envar("ENABLE_SECRET_CACHE").Bool()
+		pprofBindAddress         = app.Flag("pprof-bind-address", "Address the pprof profiling server listens on, such as :8083. Empty disables profiling.").Default("").Envar("PPROF_BIND_ADDRESS").String()
 
 		// namespace = app.Flag("namespace", "Namespace used to set as default scope in default secret store config.").Default("crossplane-system").Envar("POD_NAMESPACE").String()
 	)
@@ -72,10 +79,36 @@ func main() {
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
 
+	// The scheme must be populated before ctrl.NewManager: the CRD cache
+	// transform below resolves its ByObject GVK at manager construction time.
+	scheme := runtime.NewScheme()
+	kingpin.FatalIfError(clientgoscheme.AddToScheme(scheme), "Cannot add client-go APIs to scheme")
+	kingpin.FatalIfError(apis.AddToScheme(scheme), "Cannot add Http APIs to scheme")
+	kingpin.FatalIfError(apiextensionsv1.AddToScheme(scheme), "Cannot add CRD APIs to scheme")
+
+	var clientOpts client.Options
+	if !*enableSecretCache {
+		clientOpts.Cache = &client.CacheOptions{DisableFor: []client.Object{&corev1.Secret{}}}
+	}
+
 	mgr, err := ctrl.NewManager(ratelimiter.LimitRESTConfig(cfg, *maxReconcileRate), ctrl.Options{
+		Scheme: scheme,
+		Client: clientOpts,
 		Cache: cache.Options{
 			SyncPeriod: syncInterval,
+			// Nobody reads managedFields from the cache; dropping them roughly
+			// halves the size of objects written with server-side apply.
+			DefaultTransform: cache.TransformStripManagedFields(),
+			ByObject: map[client.Object]cache.ByObject{
+				// The CRD gate caches every CRD in the cluster but only needs
+				// names and conditions. This transform replaces DefaultTransform
+				// and also strips managedFields. Never Update a cached CRD.
+				&apiextensionsv1.CustomResourceDefinition{}: {
+					Transform: customresourcesgate.TransformStripCRDSchema,
+				},
+			},
 		},
+		PprofBindAddress: *pprofBindAddress,
 		// controller-runtime uses both ConfigMaps and Leases for leader
 		// election by default. Leases expire after 15 seconds, with a
 		// 10 second renewal deadline. We've observed leader loss due to
@@ -90,10 +123,6 @@ func main() {
 		RenewDeadline:              func() *time.Duration { d := 50 * time.Second; return &d }(),
 	})
 	kingpin.FatalIfError(err, "Cannot create controller manager")
-	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add Http APIs to scheme")
-
-	// Add CRD types to scheme for SafeStart capability
-	kingpin.FatalIfError(apiextensionsv1.AddToScheme(mgr.GetScheme()), "Cannot add CRD APIs to scheme")
 
 	metricRecorder := managed.NewMRMetricRecorder()
 	stateMetrics := statemetrics.NewMRStateMetrics()
@@ -133,6 +162,8 @@ func main() {
 			Gate:                    crdGate,
 			Logger:                  log,
 			MaxConcurrentReconciles: 1,
+			// Only reconcile this provider's CRDs, not every CRD in the cluster.
+			Groups: []string{clusterv1alpha1.Group, namespacedv1alpha2.Group},
 		}
 		kingpin.FatalIfError(customresourcesgate.Setup(mgr, gateOpts), "Cannot setup CRD gate controller")
 		kingpin.FatalIfError(httpcontrollers.SetupGated(mgr, o, *timeout), "Cannot setup provider controllers")
